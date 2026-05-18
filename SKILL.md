@@ -40,19 +40,19 @@ description: |
 
 ## 安装
 
-运行安装脚本，自动检测当前聊天渠道并创建 cron 任务：
+运行安装脚本（跨平台，需要 Node.js）：
 
 ```bash
-bash scripts/setup.sh
+node scripts/setup.js
 ```
 
 脚本会：
 1. 检查 routine.json 是否存在（不存在则创建示例）
-2. 检测当前 OpenClaw 的 channel 和 chat_id
-3. 创建每 5 分钟执行的 cron 任务
-4. Agent 通过 `sessions_send` 投递提醒到聊天渠道
+2. 复制网页编辑器和同步服务到 workspace
+3. 检测当前 OpenClaw 的 channel 和 chat_id
+4. 创建每 5 分钟执行的 cron 任务
 
-## 手动安装
+### 手动安装
 
 如果脚本不适用，手动创建 cron：
 
