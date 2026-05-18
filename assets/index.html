@@ -116,7 +116,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="hdr-sub">设定每日作息，到点自动提醒</div>
   </div>
   <div style="display:flex;gap:8px">
-    <button class="btn btn-g" onclick="syncToBot()">🔄 同步提醒</button>
+    <button class="btn btn-g" onclick="syncToBot()">📂 打开文件</button>
     <button class="btn btn-p" onclick="openModal()">+ 新建</button>
   </div>
 </div>
@@ -704,47 +704,123 @@ function pad(n) { return n < 10 ? '0' + n : '' + n; }
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 2000); }
 
-// --- Sync to bot ---
-var syncServerOk = false;
+// --- File System Access API (直接读写文件) ---
+var fileHandle = null;
+var fileSupported = 'showSaveFilePicker' in window;
+var DB_NAME = 'routine-planner';
+var STORE_NAME = 'handles';
 
-// Check sync server on load
-fetch('http://127.0.0.1:19831/routine').then(function(r) {
-  if (r.ok) { syncServerOk = true; updateSyncStatus(true); }
-}).catch(function() {});
-
-function updateSyncStatus(ok) {
-  var btn = document.querySelector('[onclick="syncToBot()"]');
-  if (!btn) return;
-  if (ok) { btn.textContent = '💾 保存到文件'; btn.style.borderColor = 'var(--gn)'; }
-  else { btn.textContent = '📤 下载 JSON'; btn.style.borderColor = ''; }
+// IndexedDB 存取 file handle
+function dbGet(key) {
+  return new Promise(function(resolve) {
+    var req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore(STORE_NAME); };
+    req.onsuccess = function(e) {
+      var tx = e.target.result.transaction(STORE_NAME, 'readonly');
+      tx.objectStore(STORE_NAME).get(key).onsuccess = function(e) { resolve(e.target.result); };
+    };
+    req.onerror = function() { resolve(null); };
+  });
 }
 
-function syncToBot() {
-  if (!routine.length) { showToast('没有规划数据'); return; }
-  var payload = JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() });
+function dbSet(key, val) {
+  return new Promise(function(resolve) {
+    var req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore(STORE_NAME); };
+    req.onsuccess = function(e) {
+      var tx = e.target.result.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(val, key).onsuccess = function() { resolve(); };
+    };
+    req.onerror = function() { resolve(); };
+  });
+}
 
-  if (syncServerOk) {
-    fetch('http://127.0.0.1:19831/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload
-    }).then(function(res) { return res.json(); }).then(function(data) {
-      if (data.ok) showToast('✅ 已保存 ' + data.count + ' 条规划');
-      else showToast('❌ 保存失败: ' + data.error);
-    }).catch(function() { downloadJSON(payload); });
-  } else {
-    downloadJSON(payload);
+// 页面加载时恢复文件句柄
+async function restoreFileHandle() {
+  if (!fileSupported) return;
+  try {
+    fileHandle = await dbGet('routineFileHandle');
+    if (fileHandle) {
+      // 验证权限
+      var perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        updateBtnText();
+        // 自动加载最新数据
+        try {
+          var f = await fileHandle.getFile();
+          var data = JSON.parse(await f.text());
+          if (data.routine && Array.isArray(data.routine)) {
+            routine = data.routine;
+            saveData();
+            renderAll();
+          }
+        } catch(e) {}
+      } else if (perm === 'prompt') {
+        // 需要用户点击授权
+        fileHandle = null;
+      }
+    }
+  } catch(e) { fileHandle = null; }
+}
+
+function updateBtnText() {
+  var btns = document.querySelectorAll('[onclick="syncToBot()"]');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].textContent = fileHandle ? '💾 保存到文件' : '📂 打开文件';
   }
 }
 
-function downloadJSON(payload) {
+// 用户点击按钮
+async function syncToBot() {
+  if (!routine.length) { showToast('没有规划数据'); return; }
+
+  // 有句柄且有权限，直接写入
+  if (fileHandle) {
+    try {
+      var perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await writeToFile();
+        return;
+      }
+    } catch(e) {}
+    fileHandle = null;
+  }
+
+  // 支持 API，弹出文件选择
+  if (fileSupported) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'routine.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+      });
+      await dbSet('routineFileHandle', fileHandle);
+      await writeToFile();
+      updateBtnText();
+    } catch(e) { if (e.name !== 'AbortError') console.error(e); }
+    return;
+  }
+
+  // 降级下载
+  var payload = JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() });
   var blob = new Blob([payload], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'routine.json';
   a.click();
-  showToast('📥 已下载 routine.json，请放到 workspace/time-planner/ 目录');
+  showToast('📥 已下载 routine.json');
 }
+
+async function writeToFile() {
+  try {
+    var writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() }, null, 2));
+    await writable.close();
+    showToast('✅ 已保存到文件');
+  } catch(e) { console.error(e); showToast('❌ 保存失败'); }
+}
+
+// 页面加载时恢复
+restoreFileHandle();
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModal();
