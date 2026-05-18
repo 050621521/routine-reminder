@@ -21,7 +21,16 @@ git clone https://github.com/050621521/routine-reminder.git
 
 ## 使用方法
 
-### 1. 创建规划文件
+### 1. 启动同步服务
+
+```bash
+cd ~/.local/lib/node_modules/openclaw/skills/routine-reminder
+bash scripts/start.sh
+```
+
+这会启动同步服务并自动打开网页编辑器。编辑完规划后点「🔄 同步提醒」即可保存。
+
+### 2. 创建规划文件
 
 在 `~/.openclaw/workspace/time-planner/routine.json` 中定义你的每日规划：
 

@@ -77,17 +77,15 @@ Agent 提示词模板见 [references/agent-prompt.txt](references/agent-prompt.t
 - 📅 按时间轴展示每日规划
 - ✏️ 添加/编辑/删除规划
 - 🏷️ 按分类颜色区分（工作、学习、健康等）
-- 📤 导出/导入 JSON
-- 💾 保存到 sync-server.js
+- 🔄 一键同步提醒
 
 使用方式：
 ```bash
-# 启动同步服务器（可选，用于网页保存）
-node sync-server.js
-
-# 直接用浏览器打开 index.html
-open index.html
+# 启动同步服务并自动打开网页
+bash scripts/start.sh
 ```
+
+编辑完规划后点「🔄 同步提醒」即可保存。
 
 ## 管理
 
