@@ -2,13 +2,13 @@
 
 每日循环规划提醒 [OpenClaw](https://github.com/openclaw/openclaw) Skill。
 
-读取 `routine.json` 中的每日规划，在活动开始前自动通过微信/Telegram/Discord 等聊天渠道发送提醒。
+读取 `routine.json` 中的每日规划，在活动开始前自动通过微信发送提醒。
 
 ## 功能
 
 - ⏰ 每 5 分钟自动检查规划
 - 📅 支持按星期几设置不同规划
-- 🔔 通过当前聊天渠道发送提醒（微信、Telegram、Discord 等）
+- 🔔 通过微信发送提醒
 - 📝 纯 JSON 配置，简单直观
 
 ## 快速安装
@@ -112,7 +112,7 @@ openclaw cron rm <job-id>
 ## 依赖
 
 - [OpenClaw](https://github.com/openclaw/openclaw) 2026.5+
-- 已配置的聊天渠道（微信、Telegram、Discord 等）
+- 已配置的微信渠道（openclaw-weixin）
 
 ## License
 
