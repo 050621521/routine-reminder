@@ -261,8 +261,9 @@ function getFilteredRoutine() {
   });
 }
 
-function init() {
-  loadData();
+async function init() {
+  await tryServer();
+  if (!serverMode) loadData();
   renderDayBar();
   renderAll();
   setInterval(updateNow, 1000);
@@ -713,128 +714,52 @@ function pad(n) { return n < 10 ? '0' + n : '' + n; }
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 2000); }
 
-// --- File System Access API (直接读写文件) ---
-var fileHandle = null;
-var fileSupported = 'showSaveFilePicker' in window;
-var DB_NAME = 'routine-planner';
-var STORE_NAME = 'handles';
+// --- 服务器模式（优先）+ 本地文件降级 ---
+var serverMode = false;
 
-// IndexedDB 存取 file handle
-function dbGet(key) {
-  return new Promise(function(resolve) {
-    var req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = function(e) { e.target.result.createObjectStore(STORE_NAME); };
-    req.onsuccess = function(e) {
-      var tx = e.target.result.transaction(STORE_NAME, 'readonly');
-      tx.objectStore(STORE_NAME).get(key).onsuccess = function(e) { resolve(e.target.result); };
-    };
-    req.onerror = function() { resolve(null); };
-  });
-}
-
-function dbSet(key, val) {
-  return new Promise(function(resolve) {
-    var req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = function(e) { e.target.result.createObjectStore(STORE_NAME); };
-    req.onsuccess = function(e) {
-      var tx = e.target.result.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put(val, key).onsuccess = function() { resolve(); };
-    };
-    req.onerror = function() { resolve(); };
-  });
-}
-
-// 页面加载时恢复文件句柄
-async function restoreFileHandle() {
-  if (!fileSupported) return;
+async function tryServer() {
   try {
-    fileHandle = await dbGet('routineFileHandle');
-    if (fileHandle) {
-      var perm = await fileHandle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
+    var resp = await fetch('http://127.0.0.1:19831/routine');
+    if (resp.ok) {
+      var data = await resp.json();
+      if (data.routine && Array.isArray(data.routine)) {
+        routine = data.routine;
+        serverMode = true;
+        saveData();
+        renderAll();
         updateBtnText();
-        // 自动加载最新数据
-        try {
-          var f = await fileHandle.getFile();
-          var data = JSON.parse(await f.text());
-          if (data.routine && Array.isArray(data.routine)) {
-            routine = data.routine;
-            saveData();
-            renderAll();
-          }
-        } catch(e) {}
-      } else {
-        // 尝试请求权限（部分浏览器允许无手势恢复）
-        try {
-          var result = await fileHandle.requestPermission({ mode: 'readwrite' });
-          if (result === 'granted') {
-            updateBtnText();
-            try {
-              var f = await fileHandle.getFile();
-              var data = JSON.parse(await f.text());
-              if (data.routine && Array.isArray(data.routine)) {
-                routine = data.routine;
-                saveData();
-                renderAll();
-              }
-            } catch(e) {}
-          } else {
-            fileHandle = null;
-          }
-        } catch(e) {
-          fileHandle = null;
-        }
+        return true;
       }
     }
-  } catch(e) { fileHandle = null; }
+  } catch(e) {}
+  return false;
 }
 
 function updateBtnText() {
   var btns = document.querySelectorAll('[onclick="syncToBot()"]');
   for (var i = 0; i < btns.length; i++) {
-    btns[i].textContent = fileHandle ? '💾 保存到文件' : '📂 打开文件';
+    btns[i].textContent = serverMode ? '💾 保存到文件' : '📂 打开文件';
   }
-  // 更新提示文字
   var hint = document.getElementById('fileHint');
-  if (hint) hint.textContent = fileHandle ? '已关联文件，点击直接保存' : '首次使用需选择 routine.json 文件';
+  if (hint) hint.textContent = serverMode ? '服务器模式 · 点击直接保存' : '请先启动 server.js';
 }
 
-// 用户点击按钮
-async function syncToBot() {
+function syncToBot() {
   if (!routine.length) { showToast('没有规划数据'); return; }
+  var payload = JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() });
 
-  // 有句柄但没权限，请求权限
-  if (fileHandle) {
-    try {
-      var perm = await fileHandle.queryPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') {
-        perm = await fileHandle.requestPermission({ mode: 'readwrite' });
-      }
-      if (perm === 'granted') {
-        await writeToFile();
-        return;
-      }
-    } catch(e) {}
-    fileHandle = null;
-    await dbSet('routineFileHandle', null);
-  }
-
-  // 支持 API，弹出文件选择
-  if (fileSupported) {
-    try {
-      fileHandle = await window.showSaveFilePicker({
-        suggestedName: 'routine.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-      });
-      await dbSet('routineFileHandle', fileHandle);
-      await writeToFile();
-      updateBtnText();
-    } catch(e) { if (e.name !== 'AbortError') console.error(e); }
+  if (serverMode) {
+    fetch('http://127.0.0.1:19831/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.ok) showToast('✅ 已保存 ' + d.count + ' 条规划');
+      else showToast('❌ 保存失败');
+    }).catch(function() { showToast('❌ 服务器断开'); serverMode = false; updateBtnText(); });
     return;
   }
 
-  // 降级下载
-  var payload = JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() });
   var blob = new Blob([payload], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -843,36 +768,16 @@ async function syncToBot() {
   showToast('📥 已下载 routine.json');
 }
 
-async function writeToFile() {
-  try {
-    var writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() }, null, 2));
-    await writable.close();
-    showToast('✅ 已保存到文件');
-  } catch(e) { console.error(e); showToast('❌ 保存失败'); }
-}
+tryServer();
 
-// 页面加载时恢复
-restoreFileHandle();
-
-// 显示文件路径
-var homeDir = '';
-try {
-  // 推断用户主目录
-  var p = decodeURIComponent(location.pathname);
-  if (p.indexOf('/.openclaw/') !== -1) homeDir = p.substring(0, p.indexOf('/.openclaw/'));
-  else if (p.indexOf('/time-planner/') !== -1) homeDir = p.substring(0, p.indexOf('/time-planner/'));
-} catch(e) {}
-var routinePath = (homeDir || '~') + '/Desktop/routine.json';
 var pathEl = document.getElementById('pathText');
-if (pathEl) pathEl.textContent = routinePath;
+if (pathEl) pathEl.textContent = '桌面 / routine.json';
 
 function copyPath() {
   var text = document.getElementById('pathText').textContent;
   navigator.clipboard.writeText(text).then(function() {
     showToast('✅ 路径已复制');
   }).catch(function() {
-    // fallback
     var ta = document.createElement('textarea');
     ta.value = text;
     document.body.appendChild(ta);

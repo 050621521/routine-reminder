@@ -12,20 +12,16 @@ const readline = require('readline');
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const ask = (q) => new Promise(r => rl.question(q, r));
 
-const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.join(require('os').homedir(), '.openclaw', 'workspace');
 const DESKTOP = path.join(require('os').homedir(), 'Desktop');
 const ROUTINE_FILE = path.join(DESKTOP, 'routine.json');
-const SYNC_SERVER = path.join(WORKSPACE, 'time-planner', 'sync-server.js');
 const SKILL_DIR = path.resolve(__dirname, '..');
 
 async function main() {
   console.log('🦞 Routine Reminder 安装\n');
 
   // Step 1: Ensure routine.json exists
-  const routineDir = path.dirname(ROUTINE_FILE);
   if (!fs.existsSync(ROUTINE_FILE)) {
-    console.log('📝 routine.json 不存在，创建示例文件...');
-    fs.mkdirSync(routineDir, { recursive: true });
+    console.log('📝 创建示例规划...');
     fs.writeFileSync(ROUTINE_FILE, JSON.stringify({
       routine: [
         { activity: '工作', start: '09:00', end: '12:00', enabled: true, days: [1,2,3,4,5], category: '工作' },
@@ -33,33 +29,26 @@ async function main() {
         { activity: '运动', start: '18:00', end: '19:00', enabled: true, days: [1,3,5], category: '健康' }
       ]
     }, null, 2));
-    console.log(`   ✅ 已创建 ${ROUTINE_FILE}`);
-    console.log('   请编辑此文件添加你的日常规划。\n');
+    console.log(`   ✅ 已创建 ${ROUTINE_FILE}\n`);
   } else {
-    console.log(`✅ routine.json 已存在: ${ROUTINE_FILE}\n`);
+    console.log(`✅ routine.json 已存在\n`);
   }
 
-  // Step 2: Copy web editor + sync server
-  console.log('📦 安装网页编辑器...');
-  fs.mkdirSync(routineDir, { recursive: true });
-  fs.copyFileSync(path.join(SKILL_DIR, 'assets', 'index.html'), path.join(routineDir, 'index.html'));
-  fs.copyFileSync(path.join(SKILL_DIR, 'scripts', 'sync-server.js'), path.join(routineDir, 'sync-server.js'));
-  console.log(`   ✅ 已安装到 ${routineDir}/\n`);
+  // Step 2: Copy files to Desktop
+  console.log('📦 安装到桌面...');
+  fs.copyFileSync(path.join(SKILL_DIR, 'assets', 'index.html'), path.join(DESKTOP, 'index.html'));
+  fs.copyFileSync(path.join(SKILL_DIR, 'scripts', 'server.js'), path.join(DESKTOP, 'server.js'));
 
-  // Step 3: Start sync server in background
-  console.log('🚀 启动同步服务...');
-  const serverProc = spawn('node', [SYNC_SERVER], {
-    detached: true,
-    stdio: 'ignore'
-  });
-  serverProc.unref();
+  // Create start script
+  if (process.platform === 'win32') {
+    fs.writeFileSync(path.join(DESKTOP, '启动规划.bat'), '@echo off\nnode "%~dp0server.js"\npause');
+  } else {
+    fs.writeFileSync(path.join(DESKTOP, '启动规划.command'), '#!/bin/bash\ncd "$(dirname "$0")"\nnode server.js\n');
+    fs.chmodSync(path.join(DESKTOP, '启动规划.command'), '755');
+  }
+  console.log('   ✅ 桌面已就绪：routine.json + index.html + server.js + 启动脚本\n');
 
-  const pidFile = path.join(routineDir, '.sync-server.pid');
-  fs.writeFileSync(pidFile, String(serverProc.pid));
-  console.log(`   ✅ 同步服务已启动 (PID: ${serverProc.pid})`);
-  console.log('   📝 服务会一直在后台运行，重启电脑后需重新启动\n`);
-
-  // Step 4: Detect channel info
+  // Step 3: Detect channel info
   console.log('🔍 检测 OpenClaw 配置...');
   let channel = '', chatId = '', accountId = '';
 
@@ -85,13 +74,13 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 5: Build agent prompt
+  // Step 4: Build agent prompt
   let agentPrompt = fs.readFileSync(path.join(SKILL_DIR, 'references', 'agent-prompt.txt'), 'utf8');
   agentPrompt = agentPrompt
     .replace(/\{\{SESSION_KEY\}\}/g, `agent:main:${channel}:direct:${chatId}`)
     .replace(/\{\{ROUTINE_PATH\}\}/g, ROUTINE_FILE);
 
-  // Step 6: Build cron command
+  // Step 5: Build cron command
   const cronArgs = [
     'cron', 'add',
     '--name', '每日规划提醒',
@@ -106,9 +95,7 @@ async function main() {
   ];
   if (accountId) cronArgs.push('--account', accountId);
 
-  console.log('\n📋 即将创建以下 cron 任务：');
-  console.log('   名称: 每日规划提醒');
-  console.log('   频率: 每 5 分钟');
+  console.log('\n📋 即将创建 cron 任务：');
   console.log(`   渠道: ${channel} -> ${chatId}`);
   console.log(`   文件: ${ROUTINE_FILE}\n`);
 
@@ -119,7 +106,7 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 7: Create cron job
+  // Step 6: Create cron job
   console.log('⏳ 创建 cron 任务...');
   try {
     const result = execSync(`openclaw ${cronArgs.join(' ')}`, { encoding: 'utf8', timeout: 15000 });
@@ -127,16 +114,17 @@ async function main() {
     const jobId = parsed.id || 'unknown';
 
     console.log('\n✅ 安装完成！\n');
+    console.log('   桌面上有以下文件：');
+    console.log('   ├── routine.json     ← 规划数据');
+    console.log('   ├── index.html       ← 网页编辑器');
+    console.log('   ├── server.js        ← 本地服务');
+    console.log('   └── 启动规划.command  ← 双击启动\n');
+    console.log('📌 使用方式：');
+    console.log('   双击「启动规划」→ 自动打开网页 → 编辑 → 点保存\n');
     console.log(`   Cron ID: ${jobId}`);
-    console.log(`   规划文件: ${ROUTINE_FILE}`);
-    console.log(`   网页编辑器: ${path.join(routineDir, 'index.html')}\n`);
-    console.log('📌 常用命令：');
-    console.log('   打开编辑器:  直接打开 index.html');
-    console.log('   查看任务:    openclaw cron list');
-    console.log(`   手动触发:    openclaw cron run ${jobId}`);
-    console.log(`   查看历史:    openclaw cron runs --id ${jobId}\n`);
-    console.log(`提醒会在每个活动开始前 ±5 分钟内通过 ${channel} 发送。\n`);
-    console.log('💡 现在可以直接打开 index.html 编辑规划，点「💾 保存到文件」即可同步。');
+    console.log(`   查看任务: openclaw cron list`);
+    console.log(`   手动触发: openclaw cron run ${jobId}\n`);
+    console.log('提醒会在每个活动开始前 ±5 分钟内通过微信发送。');
   } catch (e) {
     console.log('\n❌ 创建失败：');
     console.log(e.message);
