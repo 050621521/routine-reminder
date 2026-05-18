@@ -53,7 +53,15 @@ else
     echo ""
 fi
 
-# Step 2: Detect channel info
+# Step 2: Copy web editor + sync server
+echo "📦 安装网页编辑器..."
+mkdir -p "$WORKSPACE/time-planner"
+cp "$SKILL_DIR/assets/index.html" "$WORKSPACE/time-planner/index.html"
+cp "$SKILL_DIR/scripts/sync-server.js" "$WORKSPACE/time-planner/sync-server.js"
+echo "   ✅ 已安装到 $WORKSPACE/time-planner/"
+echo ""
+
+# Step 3: Detect channel info
 echo "🔍 检测 OpenClaw 配置..."
 
 # Try to get sessions info
@@ -91,12 +99,12 @@ if [ -z "$CHANNEL" ] || [ -z "$CHAT_ID" ]; then
     exit 1
 fi
 
-# Step 3: Build agent prompt
+# Step 4: Build agent prompt
 AGENT_PROMPT=$(cat "$SKILL_DIR/references/agent-prompt.txt" | \
     sed "s|AGENT_MAIN_SESSION_KEY|agent:main:${CHANNEL}:direct:${CHAT_ID}|g" | \
     sed "s|/Users/kwy/.openclaw/workspace|$WORKSPACE|g")
 
-# Step 4: Build cron command
+# Step 5: Build cron command
 CRON_CMD="openclaw cron add \
   --name '每日规划提醒' \
   --description '每5分钟检查每日规划，通过聊天渠道提醒' \
@@ -126,7 +134,7 @@ if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
     exit 0
 fi
 
-# Step 5: Create cron job
+# Step 6: Create cron job
 echo "⏳ 创建 cron 任务..."
 RESULT=$(eval "$CRON_CMD" 2>&1)
 
@@ -137,14 +145,17 @@ if echo "$RESULT" | grep -q '"ok": true\|"id":'; then
     echo ""
     echo "   Cron ID: $JOB_ID"
     echo "   规划文件: $ROUTINE_FILE"
+    echo "   网页编辑器: $WORKSPACE/time-planner/index.html"
     echo ""
     echo "📌 常用命令："
+    echo "   启动编辑器:  bash scripts/start.sh"
     echo "   查看任务:    openclaw cron list"
     echo "   手动触发:    openclaw cron run $JOB_ID"
     echo "   查看历史:    openclaw cron runs --id $JOB_ID"
-    echo "   编辑规划:    编辑 $ROUTINE_FILE"
     echo ""
     echo "提醒会在每个活动开始前 ±5 分钟内通过 $CHANNEL 发送。"
+    echo ""
+    echo "💡 下一步：运行 bash scripts/start.sh 启动同步服务，然后在网页里编辑规划。"
 else
     echo ""
     echo "❌ 创建失败："
