@@ -705,24 +705,45 @@ function esc(s) { var d = document.createElement('div'); d.textContent = s; retu
 function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 2000); }
 
 // --- Sync to bot ---
+var syncServerOk = false;
+
+// Check sync server on load
+fetch('http://127.0.0.1:19831/routine').then(function(r) {
+  if (r.ok) { syncServerOk = true; updateSyncStatus(true); }
+}).catch(function() {});
+
+function updateSyncStatus(ok) {
+  var btn = document.querySelector('[onclick="syncToBot()"]');
+  if (!btn) return;
+  if (ok) { btn.textContent = '💾 保存到文件'; btn.style.borderColor = 'var(--gn)'; }
+  else { btn.textContent = '📤 下载 JSON'; btn.style.borderColor = ''; }
+}
+
 function syncToBot() {
   if (!routine.length) { showToast('没有规划数据'); return; }
-
   var payload = JSON.stringify({ routine: routine, syncedAt: new Date().toISOString() });
 
-  fetch('http://127.0.0.1:19831/sync', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payload
-  }).then(function(res) { return res.json(); }).then(function(data) {
-    if (data.ok) {
-      showToast('✅ 已同步 ' + data.count + ' 条规划，到点微信提醒你');
-    } else {
-      showToast('❌ 同步失败: ' + data.error);
-    }
-  }).catch(function(err) {
-    showToast('❌ 同步失败，服务未启动');
-  });
+  if (syncServerOk) {
+    fetch('http://127.0.0.1:19831/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      if (data.ok) showToast('✅ 已保存 ' + data.count + ' 条规划');
+      else showToast('❌ 保存失败: ' + data.error);
+    }).catch(function() { downloadJSON(payload); });
+  } else {
+    downloadJSON(payload);
+  }
+}
+
+function downloadJSON(payload) {
+  var blob = new Blob([payload], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'routine.json';
+  a.click();
+  showToast('📥 已下载 routine.json，请放到 workspace/time-planner/ 目录');
 }
 
 document.addEventListener('keydown', function(e) {
