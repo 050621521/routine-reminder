@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日规划 - Routine Planner</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a2e;
+    --card-hover: #1f1f3a;
+    --accent: #e94560;
+    --accent2: #0f3460;
+    --text: #eee;
+    --text-dim: #888;
+    --border: #2a2a4a;
+    --success: #00c853;
+    --tag-work: #ff6b35;
+    --tag-study: #e94560;
+    --tag-health: #00c853;
+    --tag-rest: #7b68ee;
+    --tag-other: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 24px; }
+  .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 24px; font-size: 14px; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .toolbar button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all .2s; }
+  .btn-add { background: var(--accent); color: #fff; }
+  .btn-add:hover { background: #ff5a7a; }
+  .btn-save { background: var(--accent2); color: #fff; }
+  .btn-save:hover { background: #1a4a80; }
+  .btn-export { background: #2a2a4a; color: var(--text); border: 1px solid var(--border) !important; }
+  .btn-export:hover { background: #3a3a5a; }
+  .btn-import { background: #2a2a4a; color: var(--text); border: 1px solid var(--border) !important; }
+  .btn-import:hover { background: #3a3a5a; }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-ok { background: var(--success); }
+  .dot-err { background: var(--accent); }
+  .day-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .day-tab { padding: 6px 14px; border-radius: 20px; background: var(--card); border: 1px solid var(--border); cursor: pointer; font-size: 13px; transition: all .2s; }
+  .day-tab.active { background: var(--accent); border-color: var(--accent); }
+  .day-tab:hover { border-color: var(--accent); }
+  .timeline { position: relative; }
+  .hour-row { display: flex; align-items: stretch; min-height: 50px; border-bottom: 1px solid var(--border); }
+  .hour-label { width: 60px; flex-shrink: 0; padding: 4px 8px; font-size: 12px; color: var(--text-dim); display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 2px; }
+  .hour-content { flex: 1; position: relative; padding: 2px 4px; }
+  .routine-item { position: absolute; left: 4px; right: 4px; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; transition: all .2s; overflow: hidden; z-index: 1; }
+  .routine-item:hover { transform: scale(1.01); z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  .routine-item .name { font-weight: 600; }
+  .routine-item .time { font-size: 11px; opacity: .8; margin-top: 2px; }
+  .routine-item.disabled { opacity: .35; }
+  .cat-work { background: rgba(255,107,53,.2); border-left: 3px solid var(--tag-work); }
+  .cat-study { background: rgba(233,69,96,.2); border-left: 3px solid var(--tag-study); }
+  .cat-health { background: rgba(0,200,83,.2); border-left: 3px solid var(--tag-health); }
+  .cat-rest { background: rgba(123,104,238,.2); border-left: 3px solid var(--tag-rest); }
+  .cat-other { background: rgba(136,136,136,.2); border-left: 3px solid var(--tag-other); }
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; justify-content: center; align-items: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--card); border-radius: 12px; padding: 24px; width: 90%; max-width: 420px; }
+  .modal h2 { margin-bottom: 16px; font-size: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+  .form-group input, .form-group select { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+  .day-checks { display: flex; gap: 6px; flex-wrap: wrap; }
+  .day-checks label { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+  .day-checks input:checked + span { color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-actions button { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .btn-cancel { background: var(--border); color: var(--text); }
+  .btn-delete { background: #c62828; color: #fff; }
+  .btn-confirm { background: var(--accent); color: #fff; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+  .empty p { margin-bottom: 12px; }
+  @media (max-width: 600px) {
+    .container { padding: 12px; }
+    .hour-label { width: 45px; font-size: 11px; }
+    .toolbar { flex-direction: column; }
+    .status { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🕐 每日规划</h1>
+  <p class="subtitle">Routine Planner — 编辑你的日常循环规划</p>
+
+  <div class="toolbar">
+    <button class="btn-add" onclick="openAdd()">＋ 添加规划</button>
+    <button class="btn-save" onclick="saveToServer()">💾 保存到服务器</button>
+    <button class="btn-export" onclick="exportJSON()">📤 导出 JSON</button>
+    <button class="btn-import" onclick="document.getElementById('importFile').click()">📥 导入 JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    <div class="status">
+      <span class="dot dot-ok" id="statusDot"></span>
+      <span id="statusText">就绪</span>
+    </div>
+  </div>
+
+  <div class="day-tabs" id="dayTabs"></div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">添加规划</h2>
+    <input type="hidden" id="editId">
+    <div class="form-group">
+      <label>活动名称</label>
+      <input type="text" id="fActivity" placeholder="如：工作、运动、读书">
+    </div>
+    <div class="form-group">
+      <label>开始时间</label>
+      <input type="time" id="fStart" value="09:00">
+    </div>
+    <div class="form-group">
+      <label>结束时间</label>
+      <input type="time" id="fEnd" value="10:00">
+    </div>
+    <div class="form-group">
+      <label>分类</label>
+      <select id="fCategory">
+        <option value="工作">🏢 工作</option>
+        <option value="学习">📚 学习</option>
+        <option value="健康">💪 健康</option>
+        <option value="休息">😴 休息</option>
+        <option value="出行">🚗 出行</option>
+        <option value="其他">📌 其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>生效星期</label>
+      <div class="day-checks" id="dayChecks"></div>
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" id="fEnabled" checked> 启用</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-delete" id="btnDelete" style="display:none" onclick="deleteItem()">删除</button>
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+const CAT_MAP = { '工作': 'work', '学习': 'study', '健康': 'health', '休息': 'rest', '出行': 'work', '其他': 'other' };
+let routine = [];
+let currentDay = new Date().getDay();
+
+async function init() {
+  try {
+    const resp = await fetch('routine.json');
+    if (resp.ok) {
+      const data = await fetch('routine.json').then(r => r.json());
+      routine = data.routine || [];
+    }
+  } catch(e) {
+    // Try sync server
+    try {
+      const resp = await fetch('http://127.0.0.1:19831/routine');
+      if (resp.ok) routine = (await resp.json()).routine || [];
+    } catch(e2) {}
+  }
+  renderDayTabs();
+  renderTimeline();
+}
+
+function renderDayTabs() {
+  const el = document.getElementById('dayTabs');
+  el.innerHTML = DAY_NAMES.map((name, i) =>
+    `<div class="day-tab ${i === currentDay ? 'active' : ''}" onclick="selectDay(${i})">周${name}</div>`
+  ).join('');
+}
+
+function selectDay(d) {
+  currentDay = d;
+  document.querySelectorAll('.day-tab').forEach((el, i) => el.classList.toggle('active', i === d));
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const el = document.getElementById('timeline');
+  const items = routine.filter(r => r.enabled !== false && r.days && r.days.includes(currentDay));
+  let html = '';
+  for (let h = 0; h < 24; h++) {
+    const label = `${String(h).padStart(2,'0')}:00`;
+    const hourItems = items.filter(r => {
+      const sh = parseInt(r.start.split(':')[0]);
+      return sh === h;
+    });
+    html += `<div class="hour-row"><div class="hour-label">${label}</div><div class="hour-content">`;
+    hourItems.forEach(r => {
+      const startMin = parseInt(r.start.split(':')[1]) || 0;
+      const endH = parseInt(r.end.split(':')[0]);
+      const endMin = parseInt(r.end.split(':')[1]) || 0;
+      const durationMin = (endH * 60 + endMin) - (h * 60 + startMin);
+      const height = Math.max(30, durationMin);
+      const top = startMin * (50/60);
+      const cat = CAT_MAP[r.category] || 'other';
+      html += `<div class="routine-item cat-${cat} ${r.enabled===false?'disabled':''}" style="top:${top}px;height:${height}px" onclick="openEdit('${r.id}')">
+        <div class="name">${r.activity}</div>
+        <div class="time">${r.start} - ${r.end}</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+  el.innerHTML = html;
+  if (items.length === 0) {
+    el.innerHTML += '<div class="empty"><p>今天没有规划</p><button class="btn-add" onclick="openAdd()">添加第一条规划</button></div>';
+  }
+}
+
+function genId() { return 'r-' + Date.now(); }
+
+function openAdd() {
+  document.getElementById('editId').value = '';
+  document.getElementById('modalTitle').textContent = '添加规划';
+  document.getElementById('fActivity').value = '';
+  document.getElementById('fStart').value = '09:00';
+  document.getElementById('fEnd').value = '10:00';
+  document.getElementById('fCategory').value = '工作';
+  document.getElementById('fEnabled').checked = true;
+  document.getElementById('btnDelete').style.display = 'none';
+  renderDayChecks([currentDay]);
+  document.getElementById('modal').classList.add('show');
+}
+
+function openEdit(id) {
+  const r = routine.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('editId').value = id;
+  document.getElementById('modalTitle').textContent = '编辑规划';
+  document.getElementById('fActivity').value = r.activity;
+  document.getElementById('fStart').value = r.start;
+  document.getElementById('fEnd').value = r.end;
+  document.getElementById('fCategory').value = r.category || '其他';
+  document.getElementById('fEnabled').checked = r.enabled !== false;
+  document.getElementById('btnDelete').style.display = 'inline-block';
+  renderDayChecks(r.days || []);
+  document.getElementById('modal').classList.add('show');
+}
+
+function renderDayChecks(selected) {
+  const el = document.getElementById('dayChecks');
+  el.innerHTML = DAY_NAMES.map((name, i) =>
+    `<label><input type="checkbox" value="${i}" ${selected.includes(i)?'checked':''}><span>周${name}</span></label>`
+  ).join('');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function saveItem() {
+  const id = document.getElementById('editId').value;
+  const activity = document.getElementById('fActivity').value.trim();
+  const start = document.getElementById('fStart').value;
+  const end = document.getElementById('fEnd').value;
+  const category = document.getElementById('fCategory').value;
+  const enabled = document.getElementById('fEnabled').checked;
+  const days = Array.from(document.querySelectorAll('#dayChecks input:checked')).map(x => parseInt(x.value));
+
+  if (!activity) return alert('请输入活动名称');
+  if (days.length === 0) return alert('请至少选择一天');
+
+  if (id) {
+    const idx = routine.findIndex(r => r.id === id);
+    if (idx >= 0) routine[idx] = { ...routine[idx], activity, start, end, category, enabled, days };
+  } else {
+    routine.push({ id: genId(), activity, start, end, category, enabled, days });
+  }
+  closeModal();
+  renderTimeline();
+}
+
+function deleteItem() {
+  const id = document.getElementById('editId').value;
+  if (!id || !confirm('确定删除这条规划？')) return;
+  routine = routine.filter(r => r.id !== id);
+  closeModal();
+  renderTimeline();
+}
+
+async function saveToServer() {
+  const data = { routine, syncedAt: new Date().toISOString() };
+  try {
+    const resp = await fetch('http://127.0.0.1:19831/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await resp.json();
+    if (result.ok) {
+      setStatus('ok', `已保存 ${result.count} 条规划`);
+    } else {
+      setStatus('err', '保存失败: ' + result.error);
+    }
+  } catch(e) {
+    setStatus('err', '无法连接服务器，请确保 sync-server.js 运行中');
+  }
+}
+
+function exportJSON() {
+  const data = { routine, syncedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'routine.json';
+  a.click();
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.routine && Array.isArray(data.routine)) {
+        routine = data.routine;
+        renderTimeline();
+        setStatus('ok', `已导入 ${routine.length} 条规划`);
+      } else {
+        setStatus('err', '无效的 routine.json 格式');
+      }
+    } catch(err) {
+      setStatus('err', '文件解析失败');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function setStatus(type, msg) {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className = 'dot ' + (type === 'ok' ? 'dot-ok' : 'dot-err');
+  text.textContent = msg;
+  setTimeout(() => { text.textContent = '就绪'; dot.className = 'dot dot-ok'; }, 3000);
+}
+
+init();
+</script>
+</body>
+</html>
