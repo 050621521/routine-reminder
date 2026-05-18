@@ -11,36 +11,29 @@
 - 🔔 通过微信发送提醒
 - 📝 纯 JSON 配置，简单直观
 - 🌐 内置网页编辑器，可视化管理规划
+- 💾 直接读写本地文件，不需要启动服务器
 
 ## 快速安装
 
 ```bash
 cd ~/.local/lib/node_modules/openclaw/skills
 git clone https://github.com/050621521/routine-reminder.git
-```
-
-## 使用方法
-
-### 1. 安装（跨平台）
-
-```bash
 cd routine-reminder
 node scripts/setup.js
 ```
 
-支持 Windows、macOS、Linux。脚本会自动检测聊天渠道并创建 cron 任务。
+安装完成后桌面上会有两个文件：
+- `routine.json` — 你的规划数据
+- `index.html` — 网页编辑器
 
-### 2. 启动编辑器
+## 使用方法
 
-```bash
-node scripts/start.js
-```
+1. 双击桌面的 `index.html` 打开编辑器
+2. 点「📂 打开文件」选择桌面的 `routine.json`
+3. 编辑规划，点「💾 保存到文件」
+4. 到点微信自动提醒
 
-自动启动同步服务并打开网页编辑器。编辑完点「🔄 同步提醒」保存。
-
-### 3. 创建规划文件
-
-在 `~/.openclaw/workspace/time-planner/routine.json` 中定义你的每日规划：
+## routine.json 格式
 
 ```json
 {
@@ -52,20 +45,10 @@ node scripts/start.js
       "enabled": true,
       "days": [1, 2, 3, 4, 5],
       "category": "工作"
-    },
-    {
-      "activity": "运动",
-      "start": "18:00",
-      "end": "19:00",
-      "enabled": true,
-      "days": [1, 3, 5],
-      "category": "健康"
     }
   ]
 }
 ```
-
-**字段说明：**
 
 | 字段 | 说明 |
 |------|------|
@@ -75,53 +58,6 @@ node scripts/start.js
 | `enabled` | 是否启用 |
 | `days` | 生效星期（0=周日, 1=周一 ... 6=周六） |
 | `category` | 分类标签（可选） |
-
-### 2. 运行安装脚本
-
-```bash
-cd ~/.local/lib/node_modules/openclaw/skills/routine-reminder
-bash scripts/setup.sh
-```
-
-脚本会自动检测你的聊天渠道并创建 cron 任务。
-
-### 3. 手动安装（可选）
-
-```bash
-openclaw cron add \
-  --name "每日规划提醒" \
-  --cron "*/5 * * * *" \
-  --tz "Asia/Shanghai" \
-  --session isolated \
-  --message '你是每日规划提醒助手...' \
-  --announce \
-  --channel <your-channel> \
-  --to "<your-chat-id>"
-```
-
-完整 Agent 提示词见 `references/agent-prompt.txt`。
-
-## 提醒效果
-
-在活动开始前 ±5 分钟内，你会收到类似这样的提醒：
-
-> ⏰ 现在是 09:00，该开始「工作」了（09:00 - 12:00）
-
-## 网页编辑器
-
-项目内置了网页版规划编辑器（`assets/index.html`），可以直接在浏览器里管理规划：
-
-```bash
-# 用浏览器打开
-open assets/index.html
-```
-
-功能：
-- 📅 时间轴视图，按小时展示
-- ✏️ 点击添加/编辑/删除
-- 🏷️ 分类颜色区分
-- 📤 导出/导入 JSON
-- 💾 保存到 sync-server.js
 
 ## 管理命令
 
@@ -146,7 +82,9 @@ openclaw cron rm <job-id>
 ## 依赖
 
 - [OpenClaw](https://github.com/openclaw/openclaw) 2026.5+
+- Node.js（OpenClaw 自带）
 - 已配置的微信渠道（openclaw-weixin）
+- 现代浏览器（Chrome/Edge 86+ 支持直接读写文件）
 
 ## License
 
