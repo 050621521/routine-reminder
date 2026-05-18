@@ -14,6 +14,7 @@ const ask = (q) => new Promise(r => rl.question(q, r));
 
 const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.join(require('os').homedir(), '.openclaw', 'workspace');
 const ROUTINE_FILE = path.join(WORKSPACE, 'time-planner', 'routine.json');
+const SYNC_SERVER = path.join(WORKSPACE, 'time-planner', 'sync-server.js');
 const SKILL_DIR = path.resolve(__dirname, '..');
 
 async function main() {
@@ -44,7 +45,20 @@ async function main() {
   fs.copyFileSync(path.join(SKILL_DIR, 'scripts', 'sync-server.js'), path.join(routineDir, 'sync-server.js'));
   console.log(`   ✅ 已安装到 ${routineDir}/\n`);
 
-  // Step 3: Detect channel info
+  // Step 3: Start sync server in background
+  console.log('🚀 启动同步服务...');
+  const serverProc = spawn('node', [SYNC_SERVER], {
+    detached: true,
+    stdio: 'ignore'
+  });
+  serverProc.unref();
+
+  const pidFile = path.join(routineDir, '.sync-server.pid');
+  fs.writeFileSync(pidFile, String(serverProc.pid));
+  console.log(`   ✅ 同步服务已启动 (PID: ${serverProc.pid})`);
+  console.log('   📝 服务会一直在后台运行，重启电脑后需重新启动\n`);
+
+  // Step 4: Detect channel info
   console.log('🔍 检测 OpenClaw 配置...');
   let channel = '', chatId = '', accountId = '';
 
@@ -70,13 +84,13 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 4: Build agent prompt
+  // Step 5: Build agent prompt
   let agentPrompt = fs.readFileSync(path.join(SKILL_DIR, 'references', 'agent-prompt.txt'), 'utf8');
   agentPrompt = agentPrompt
     .replace(/AGENT_MAIN_SESSION_KEY/g, `agent:main:${channel}:direct:${chatId}`)
     .replace(/\/Users\/kwy\/\.openclaw\/workspace/g, WORKSPACE);
 
-  // Step 5: Build cron command
+  // Step 6: Build cron command
   const cronArgs = [
     'cron', 'add',
     '--name', '每日规划提醒',
@@ -104,7 +118,7 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 6: Create cron job
+  // Step 7: Create cron job
   console.log('⏳ 创建 cron 任务...');
   try {
     const result = execSync(`openclaw ${cronArgs.join(' ')}`, { encoding: 'utf8', timeout: 15000 });
@@ -116,12 +130,12 @@ async function main() {
     console.log(`   规划文件: ${ROUTINE_FILE}`);
     console.log(`   网页编辑器: ${path.join(routineDir, 'index.html')}\n`);
     console.log('📌 常用命令：');
-    console.log('   启动编辑器:  node scripts/start.js');
+    console.log('   打开编辑器:  直接打开 index.html');
     console.log('   查看任务:    openclaw cron list');
     console.log(`   手动触发:    openclaw cron run ${jobId}`);
     console.log(`   查看历史:    openclaw cron runs --id ${jobId}\n`);
     console.log(`提醒会在每个活动开始前 ±5 分钟内通过 ${channel} 发送。\n`);
-    console.log('💡 下一步：运行 node scripts/start.js 启动同步服务，然后在网页里编辑规划。');
+    console.log('💡 现在可以直接打开 index.html 编辑规划，点「💾 保存到文件」即可同步。');
   } catch (e) {
     console.log('\n❌ 创建失败：');
     console.log(e.message);
