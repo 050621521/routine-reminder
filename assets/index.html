@@ -856,16 +856,16 @@ async function writeToFile() {
 restoreFileHandle();
 
 // 显示文件路径
-var workspacePath = '';
+var homeDir = '';
 try {
-  // 尝试从 URL 推断路径
+  // 推断用户主目录
   var p = decodeURIComponent(location.pathname);
-  if (p.indexOf('/time-planner/') !== -1) {
-    workspacePath = p.substring(0, p.indexOf('/time-planner/'));
-  }
+  if (p.indexOf('/.openclaw/') !== -1) homeDir = p.substring(0, p.indexOf('/.openclaw/'));
+  else if (p.indexOf('/time-planner/') !== -1) homeDir = p.substring(0, p.indexOf('/time-planner/'));
 } catch(e) {}
+var routinePath = (homeDir || '~') + '/Desktop/routine.json';
 var pathEl = document.getElementById('pathText');
-if (pathEl) pathEl.textContent = (workspacePath || '~/.openclaw/workspace') + '/time-planner/routine.json';
+if (pathEl) pathEl.textContent = routinePath;
 
 function copyPath() {
   var text = document.getElementById('pathText').textContent;

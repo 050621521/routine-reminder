@@ -13,7 +13,8 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const ask = (q) => new Promise(r => rl.question(q, r));
 
 const WORKSPACE = process.env.OPENCLAW_WORKSPACE || path.join(require('os').homedir(), '.openclaw', 'workspace');
-const ROUTINE_FILE = path.join(WORKSPACE, 'time-planner', 'routine.json');
+const DESKTOP = path.join(require('os').homedir(), 'Desktop');
+const ROUTINE_FILE = path.join(DESKTOP, 'routine.json');
 const SYNC_SERVER = path.join(WORKSPACE, 'time-planner', 'sync-server.js');
 const SKILL_DIR = path.resolve(__dirname, '..');
 
@@ -88,7 +89,7 @@ async function main() {
   let agentPrompt = fs.readFileSync(path.join(SKILL_DIR, 'references', 'agent-prompt.txt'), 'utf8');
   agentPrompt = agentPrompt
     .replace(/\{\{SESSION_KEY\}\}/g, `agent:main:${channel}:direct:${chatId}`)
-    .replace(/\{\{WORKSPACE\}\}/g, WORKSPACE);
+    .replace(/\{\{ROUTINE_PATH\}\}/g, ROUTINE_FILE);
 
   // Step 6: Build cron command
   const cronArgs = [

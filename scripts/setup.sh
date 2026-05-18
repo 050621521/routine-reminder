@@ -5,7 +5,8 @@
 set -e
 
 WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
-ROUTINE_FILE="$WORKSPACE/time-planner/routine.json"
+DESKTOP="$HOME/Desktop"
+ROUTINE_FILE="$DESKTOP/routine.json"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "🦞 Routine Reminder 安装"
@@ -102,7 +103,7 @@ fi
 # Step 4: Build agent prompt
 AGENT_PROMPT=$(cat "$SKILL_DIR/references/agent-prompt.txt" | \
     sed "s|{{SESSION_KEY}}|agent:main:${CHANNEL}:direct:${CHAT_ID}|g" | \
-    sed "s|{{WORKSPACE}}|$WORKSPACE|g")
+    sed "s|{{ROUTINE_PATH}}|$ROUTINE_FILE|g")
 
 # Step 5: Build cron command
 CRON_CMD="openclaw cron add \
