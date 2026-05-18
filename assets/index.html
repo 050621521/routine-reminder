@@ -105,6 +105,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .toast.show{transform:translateY(0);opacity:1}
 .empty{text-align:center;padding:60px 20px;color:var(--t2)}
 .empty .icon{font-size:40px;margin-bottom:8px}
+.path-hint{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.path-label{color:var(--t2);font-weight:600}
+.path-hint code{background:var(--bg);padding:3px 8px;border-radius:4px;color:var(--ac2);font-size:11px;word-break:break-all;flex:1;min-width:0}
 @media(max-width:600px){body{padding:12px}.hdr h1{font-size:18px}.now-time{font-size:26px;min-width:60px}.list-item{flex-wrap:wrap}.day-btn{padding:4px 8px;font-size:10px}}
 </style>
 </head>
@@ -113,12 +116,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="hdr">
   <div>
     <h1>⏰ 每日规划</h1>
-    <div class="hdr-sub">设定每日作息，到点自动提醒 · <span id="fileHint">首次使用需选择 routine.json 文件</span></div>
+    <div class="hdr-sub">设定每日作息，到点自动提醒 · <span id="fileHint">首次使用请选择 routine.json 文件</span></div>
   </div>
   <div style="display:flex;gap:8px">
     <button class="btn btn-g" onclick="syncToBot()">📂 打开文件</button>
     <button class="btn btn-p" onclick="openModal()">+ 新建</button>
   </div>
+</div>
+
+<div class="path-hint" id="pathHint">
+  <span class="path-label">📁 文件位置：</span>
+  <code id="pathText"></code>
+  <button class="btn btn-g btn-sm" onclick="copyPath()">复制路径</button>
 </div>
 
 <div class="now-bar">
@@ -845,6 +854,34 @@ async function writeToFile() {
 
 // 页面加载时恢复
 restoreFileHandle();
+
+// 显示文件路径
+var workspacePath = '';
+try {
+  // 尝试从 URL 推断路径
+  var p = decodeURIComponent(location.pathname);
+  if (p.indexOf('/time-planner/') !== -1) {
+    workspacePath = p.substring(0, p.indexOf('/time-planner/'));
+  }
+} catch(e) {}
+var pathEl = document.getElementById('pathText');
+if (pathEl) pathEl.textContent = (workspacePath || '~/.openclaw/workspace') + '/time-planner/routine.json';
+
+function copyPath() {
+  var text = document.getElementById('pathText').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('✅ 路径已复制');
+  }).catch(function() {
+    // fallback
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ 路径已复制');
+  });
+}
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModal();
