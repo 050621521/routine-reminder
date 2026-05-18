@@ -101,8 +101,8 @@ fi
 
 # Step 4: Build agent prompt
 AGENT_PROMPT=$(cat "$SKILL_DIR/references/agent-prompt.txt" | \
-    sed "s|AGENT_MAIN_SESSION_KEY|agent:main:${CHANNEL}:direct:${CHAT_ID}|g" | \
-    sed "s|/Users/kwy/.openclaw/workspace|$WORKSPACE|g")
+    sed "s|{{SESSION_KEY}}|agent:main:${CHANNEL}:direct:${CHAT_ID}|g" | \
+    sed "s|{{WORKSPACE}}|$WORKSPACE|g")
 
 # Step 5: Build cron command
 CRON_CMD="openclaw cron add \

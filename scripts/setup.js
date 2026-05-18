@@ -87,8 +87,8 @@ async function main() {
   // Step 5: Build agent prompt
   let agentPrompt = fs.readFileSync(path.join(SKILL_DIR, 'references', 'agent-prompt.txt'), 'utf8');
   agentPrompt = agentPrompt
-    .replace(/AGENT_MAIN_SESSION_KEY/g, `agent:main:${channel}:direct:${chatId}`)
-    .replace(/\/Users\/kwy\/\.openclaw\/workspace/g, WORKSPACE);
+    .replace(/\{\{SESSION_KEY\}\}/g, `agent:main:${channel}:direct:${chatId}`)
+    .replace(/\{\{WORKSPACE\}\}/g, WORKSPACE);
 
   // Step 6: Build cron command
   const cronArgs = [
